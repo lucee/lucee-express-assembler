@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Assemble Lucee Express with plain Maven, from org.lucee:lucee-express:<v> and its dependencies.
+
+    mvn -f pom.xml package -Dlucee.version=7.0.1.100          # -> target/lucee-express-7.0.1.100/
+    mvn -f pom.xml package -Dlucee.version=7.0.1.100 -Dexpress.dir=/opt/lucee
+
+  Everything is resolved through ~/.m2/repository, so repeat runs are offline.
+  Until org.lucee:lucee-express is on Central, point staging.repo at a repo that has it
+  (e.g. -Dstaging.repo=file:///workspace/express-maven/repo).
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.lucee.example</groupId>
+  <artifactId>lucee-express-assembly</artifactId>
+  <version>1</version>
+  <packaging>pom</packaging>
+
+  <properties>
+    <lucee.version>7.0.1.100</lucee.version>
+    <express.dir>${project.build.directory}/lucee-express-${lucee.version}</express.dir>
+    <staging.repo>https://repo1.maven.org/maven2</staging.repo>
+  </properties>
+
+  <repositories>
+    <repository>
+      <id>lucee-express-staging</id>
+      <url>${staging.repo}</url>
+      <snapshots><enabled>false</enabled></snapshots>
+    </repository>
+  </repositories>
+
+  <dependencies>
+    <!-- type pom: brings Tomcat tar.gz, the Lucee jar and the javax API jars in transitively -->
+    <dependency>
+      <groupId>org.lucee</groupId>
+      <artifactId>lucee-express</artifactId>
+      <version>${lucee.version}</version>
+      <type>pom</type>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.8.1</version>
+        <executions>
+          <!-- 1. Tomcat distribution: strip apache-tomcat-x.y.z/, skip webapps/ -->
+          <execution>
+            <id>tomcat</id>
+            <phase>package</phase>
+            <goals><goal>unpack-dependencies</goal></goals>
+            <configuration>
+              <includeTypes>tar.gz</includeTypes>
+              <outputDirectory>${express.dir}</outputDirectory>
+              <excludes>*/webapps/**</excludes>
+              <fileMappers>
+                <org.codehaus.plexus.components.io.filemappers.RegExpFileMapper>
+                  <pattern>^[^/]+/</pattern>
+                  <replacement>./</replacement>
+                </org.codehaus.plexus.components.io.filemappers.RegExpFileMapper>
+              </fileMappers>
+              <markersDirectory>${project.build.directory}/markers/${lucee.version}</markersDirectory>
+            </configuration>
+          </execution>
+          <!-- 2. Lucee jar + javax API jars into lib/ext -->
+          <execution>
+            <id>jars</id>
+            <phase>package</phase>
+            <goals><goal>copy-dependencies</goal></goals>
+            <configuration>
+              <includeTypes>jar</includeTypes>
+              <outputDirectory>${express.dir}/lib/ext</outputDirectory>
+            </configuration>
+          </execution>
+          <!-- 3. Lucee template over it -->
+          <execution>
+            <id>template</id>
+            <phase>package</phase>
+            <goals><goal>unpack</goal></goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>org.lucee</groupId>
+                  <artifactId>lucee-express</artifactId>
+                  <version>${lucee.version}</version>
+                  <classifier>template</classifier>
+                  <type>zip</type>
+                  <outputDirectory>${express.dir}</outputDirectory>
+                </artifactItem>
+              </artifactItems>
+              <overWriteReleases>true</overWriteReleases>
+              <markersDirectory>${project.build.directory}/markers/${lucee.version}</markersDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
